@@ -3,6 +3,9 @@
 	"description": "HTML baking library",
 	"copyright": "Copyright © 2015, Márcio Martins",
 	"authors": ["Márcio Martins"],
+	"license": "MIT License",
+	"targetType": "library",
+	"targetName": "embaked",
 	"dependencies": {
 		"cssd": ">=0.1.1",
 		"htmld": ">=0.2.1"
