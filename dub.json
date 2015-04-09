@@ -4,7 +4,7 @@
 	"copyright": "Copyright © 2015, Márcio Martins",
 	"authors": ["Márcio Martins"],
 	"dependencies": {
-		"cssd": "~>0.1.0",
-		"htmld": "~>0.2.0"
+		"cssd": ">=0.1.1",
+		"htmld": ">=0.2.1"
 	}
 }

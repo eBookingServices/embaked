@@ -16,7 +16,7 @@ import html;
 enum Options {
 	BakeImages		= 1 << 0,
 	BakeStyles		= 1 << 1,
-	BakeContentID	= 1 << 2,
+	BakeContentID	= 1 << 2,	// bake images but replace them and any inline images with a generated content-id
 
 	Default = BakeImages | BakeStyles,
 }
