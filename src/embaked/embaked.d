@@ -22,6 +22,9 @@ enum Options {
 }
 
 
+static __gshared Selector allWithClassAttr_ = Selector.parse("[class]");
+
+
 struct EmbeddedContent {
 	const(char)[] id;
 	const(char)[] mime;
@@ -44,7 +47,7 @@ EmbakeResult embake(const(char)[] source, Options options, const(char)[][] searc
 EmbeddedContent[] embake(Appender)(const(char)[] source, Options options, ref Appender app, const(char)[][] search = null) {
 	auto doc = createDocument!(DOMCreateOptions.Default & ~DOMCreateOptions.DecodeEntities)(source);
 	auto content = embake(doc, options, search);
-	doc.root.outerHTML(app);
+	doc.root.innerHTML(app);
 	return content;
 }
 
@@ -149,12 +152,19 @@ EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] sear
 
 		foreach(style; styles) {
 			foreach(element; doc.querySelectorAll(style.selector)) {
-				HTMLString curr = element.attr("style");
-				if (curr.empty || (curr.lastIndexOf(style.properties) != (curr.length - style.properties.length))) {
+				HTMLString curr = std.string.strip(element.attr("style"));
+				if (!curr.empty && curr.back != ';')
+					curr ~= ';';
+
+				if (curr.empty || (curr.length < style.properties.length) || (curr.lastIndexOf(style.properties) < (curr.length - style.properties.length))) {
 					curr ~= style.properties;
 					element.attr("style", curr);
 				}
 			}
+		}
+
+		foreach(element; doc.querySelectorAll(allWithClassAttr_)) {
+			element.removeAttr("class");
 		}
 	}
 
