@@ -22,7 +22,7 @@ enum Options {
 }
 
 
-static __gshared Selector allWithClassAttr_ = Selector.parse("[class]");
+__gshared Selector allWithClassAttr_ = Selector.parse("[class]");
 
 
 struct EmbeddedContent {
@@ -52,7 +52,7 @@ EmbeddedContent[] embake(Appender)(const(char)[] source, Options options, ref Ap
 }
 
 
-__gshared static auto pattern = ctRegex!(`data:([^;]+);([^,]+),(.*)`, "gis");
+__gshared auto pattern = ctRegex!(`data:([^;]+);([^,]+),(.*)`, "gis");
 
 EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] search = null) {
 	EmbeddedContent[] content;
@@ -282,32 +282,36 @@ const(ubyte)[] loadFile(const(char)[] fileName, const(char)[][] search, bool bin
 
 
 const(char)[] extensionToMimeType(const(char)[] ext) {
-    switch(ext.toLower()) {
-        case ".jpg":
-        case ".jpeg":
-            return "image/jpeg";
-        case ".png":
-            return "image/png";
-        case ".gif":
-            return "image/gif";
-        default:
-            break;
-    }
-    return null;
+	switch(ext.toLower()) {
+		case ".jpg":
+		case ".jpeg":
+			return "image/jpeg";
+		case ".png":
+			return "image/png";
+		case ".gif":
+			return "image/gif";
+		case ".tga":
+			return "image/targa";
+		case ".tif":
+			return "image/tiff";
+		default:
+			break;
+	}
+	return null;
 }
 
 
 const(char)[] mimeEncode(const(ubyte)[] input) {
-    auto mime = appender!(char[]);
-    foreach (ref encoded; Base64.encoder(chunks(cast(ubyte[])input, 57))) {
-        mime.put(encoded);
-        mime.put("\r\n");
-    }
-    return mime.data();
+	auto mime = appender!(char[]);
+	foreach (ref encoded; Base64.encoder(chunks(cast(ubyte[])input, 57))) {
+		mime.put(encoded);
+		mime.put("\r\n");
+	}
+	return mime.data();
 }
 
 
 const(char)[] generateCID(const(ubyte)[] content) {
-    import std.digest.md;
-    return md5Of(content).toHexString!(Order.increasing, LetterCase.lower)();
+	import std.digest.md;
+	return md5Of(content).toHexString!(Order.increasing, LetterCase.lower)();
 }
