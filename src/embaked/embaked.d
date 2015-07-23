@@ -8,6 +8,7 @@ import std.path;
 import std.range;
 import std.regex;
 import std.string;
+import std.traits;
 
 import css.parser;
 import html;
@@ -22,7 +23,8 @@ enum Options {
 }
 
 
-__gshared Selector allWithClassAttr_ = Selector.parse("[class]");
+private __gshared Selector allWithClassAttr_ = Selector.parse("[class]");
+private __gshared auto pattern = ctRegex!(`data:([^;]+);([^,]+),(.*)`, "gis");
 
 
 struct EmbeddedContent {
@@ -38,23 +40,38 @@ struct EmbakeResult {
 	EmbeddedContent[] content;
 }
 
-EmbakeResult embake(const(char)[] source, Options options, const(char)[][] search = null) {
+
+EmbakeResult embake(const(char)[] source, Options options, const(char)[][] paths) {
+	return embake(source, options, (const(char)[] uri, const(char)[] name) => defaultResolver(uri, name, paths));
+}
+
+
+EmbeddedContent[] embake(Appender)(const(char)[] source, Options options, ref Appender app, const(char)[][] paths) {
+	return embake(source, options, app, (const(char)[] uri, const(char)[] name) => defaultResolver(uri, name, paths));
+}
+
+
+EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] paths) {
+	return embake(doc, options, (const(char)[] uri, const(char)[] name) => defaultResolver(uri, name, paths));
+}
+
+
+EmbakeResult embake(Resolver)(const(char)[] source, Options options, Resolver resolve) if (isSomeFunction!Resolver) {
 	auto app = appender!(const(char)[]);
-	auto content = embake(source, options, app, search);
+	auto content = embake(source, options, app, resolve);
 	return EmbakeResult(app.data, content);
 }
 
-EmbeddedContent[] embake(Appender)(const(char)[] source, Options options, ref Appender app, const(char)[][] search = null) {
+
+EmbeddedContent[] embake(Appender, Resolver)(const(char)[] source, Options options, ref Appender app, Resolver resolve) if (isSomeFunction!Resolver) {
 	auto doc = createDocument!(DOMCreateOptions.Default & ~DOMCreateOptions.DecodeEntities)(source);
-	auto content = embake(doc, options, search);
+	auto content = embake(doc, options, resolve);
 	doc.root.innerHTML(app);
 	return content;
 }
 
 
-__gshared auto pattern = ctRegex!(`data:([^;]+);([^,]+),(.*)`, "gis");
-
-EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] search = null) {
+EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver resolve) if (isSomeFunction!Resolver) {
 	EmbeddedContent[] content;
 
 	if ((options & Options.BakeImages) != 0) {
@@ -79,7 +96,7 @@ EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] sear
 					if (image.mime.empty)
 						continue;
 
-					auto data = loadFile(src, search);
+					auto data = loadFile(src, resolve, true);
 					if (data.empty)
 						continue;
 
@@ -104,7 +121,7 @@ EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] sear
 				if (src.indexOf("data:") == 0)
 					continue;
 
-				auto source = loadFile(src, search);
+				auto source = loadFile(src, resolve, true);
 				if (source.empty)
 					continue;
 
@@ -112,7 +129,7 @@ EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] sear
 				if (mime.empty)
 					continue;
 
-				img.attr("src", "data:" ~ mime ~ ";base64," ~ mimeEncode(source));
+				img.attr("src", format("data:%s;base64,%s", mime, mimeEncode(source)));
 			}
 		}
 	}
@@ -139,7 +156,7 @@ EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] sear
 			if (href.empty)
 				continue;
 
-			auto source = loadFile(href, search);
+			auto source = loadFile(href, resolve, false);
 			if (source.length) {
 				parseCSS(cast(char[])source, handler);
 				useless ~= link;
@@ -172,6 +189,26 @@ EmbeddedContent[] embake(ref Document doc, Options options, const(char)[][] sear
 }
 
 
+const(char)[] defaultResolver(const(char)[] uri, const(char)[] fileName, const(char)[][] paths) {
+	if (fileName.empty)
+		return null;
+
+	if (exists(fileName))
+		return fileName;
+
+	if (fileName[0] == '/')
+		fileName = fileName[1..$];
+
+	foreach(path; paths) {
+		auto name = buildNormalizedPath(path, fileName);
+		if (exists(name))
+			return name;
+	}
+
+	return null;
+}
+
+
 private struct Style {
 	Selector selector;
 	const(char)[] selectorSource;
@@ -179,7 +216,7 @@ private struct Style {
 }
 
 
-struct CSSHandler {
+private struct CSSHandler {
 	this(ref Style[] styles) {
 		styles_ = &styles;
 	}
@@ -234,54 +271,41 @@ private:
 	const(char)[] value_;
 }
 
-const(char)[] stripUTFbyteOrderMarker(const(char)[] x) {
+
+private const(char)[] stripUTFbyteOrderMarker(const(char)[] x) {
 	if (x.length >= 3 && (x[0] == 0xef) && (x[1] == 0xbb) && (x[2] == 0xbf))
 		return x[3..$];
 	return x;
 }
 
-const(ubyte)[] loadFile(const(char)[] fileName, const(char)[][] search, bool binary = false) {
-	auto protocolLength = fileName.indexOf("://");
+
+private const(ubyte)[] loadFile(Resolver)(const(char)[] uri, Resolver resolve, bool binary) {
+	auto fileName = uri;
+	auto protocolLength = uri.indexOf("://");
 	if (protocolLength != -1) {
-		auto start = fileName.indexOf('/', protocolLength + 3);
+		auto start = uri.indexOf('/', protocolLength + 3);
 		if (start == -1)
 			return null;
-		fileName = fileName[start..$];
+
+		auto end = uri.lastIndexOf('?', start + 1);
+		if (end == -1)
+			end = uri.length;
+		fileName = uri[start..end];
 	}
 
-	if (fileName.empty)
-		return null;
-
-	if (fileName[0] == '/')
-		fileName = fileName[1..$];
-
-	if (fileName.empty)
-		return null;
-
-	if (exists(fileName)) {
+	auto resolved = resolve(uri, fileName);
+	if (exists(resolved)) {
 		if (!binary) {
-			return cast(ubyte[])((cast(char[])read(fileName)).stripUTFbyteOrderMarker);
+			return cast(ubyte[])((cast(const(char)[])read(resolved)).stripUTFbyteOrderMarker);
 		} else {
-			return cast(ubyte[])read(fileName);
+			return cast(ubyte[])read(resolved);
 		}
 	}
-
-	foreach(path; search) {
-		auto name = buildNormalizedPath(path, fileName);
-		if (exists(name)) {
-			if (!binary) {
-				return cast(ubyte[])((cast(char[])read(name)).stripUTFbyteOrderMarker);
-			} else {
-				return cast(ubyte[])read(name);
-			}
-		}
-	}
-
 	return null;
 }
 
 
-const(char)[] extensionToMimeType(const(char)[] ext) {
+private const(char)[] extensionToMimeType(const(char)[] ext) {
 	switch(ext.toLower()) {
 		case ".jpg":
 		case ".jpeg":
@@ -301,7 +325,7 @@ const(char)[] extensionToMimeType(const(char)[] ext) {
 }
 
 
-const(char)[] mimeEncode(const(ubyte)[] input) {
+private const(char)[] mimeEncode(const(ubyte)[] input) {
 	auto mime = appender!(char[]);
 	foreach (ref encoded; Base64.encoder(chunks(cast(ubyte[])input, 57))) {
 		mime.put(encoded);
@@ -311,7 +335,7 @@ const(char)[] mimeEncode(const(ubyte)[] input) {
 }
 
 
-const(char)[] generateCID(const(ubyte)[] content) {
+private const(char)[] generateCID(const(ubyte)[] content) {
 	import std.digest.md;
 	return md5Of(content).toHexString!(Order.increasing, LetterCase.lower)();
 }
