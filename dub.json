@@ -8,6 +8,6 @@
 	"targetName": "embaked",
 	"dependencies": {
 		"cssd": "~>0.1.1",
-		"htmld": "~>0.2.2"
+		"htmld": "~>0.2.9"
 	}
 }

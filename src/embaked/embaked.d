@@ -64,7 +64,7 @@ EmbakeResult embake(Resolver)(const(char)[] source, Options options, Resolver re
 
 
 EmbeddedContent[] embake(Appender, Resolver)(const(char)[] source, Options options, ref Appender app, Resolver resolve) if (isSomeFunction!Resolver) {
-	auto doc = createDocument!(DOMCreateOptions.Default & ~DOMCreateOptions.DecodeEntities)(source);
+	auto doc = createDocument(source);
 	auto content = embake(doc, options, resolve);
 	doc.root.innerHTML(app);
 	return content;
