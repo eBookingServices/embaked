@@ -162,7 +162,6 @@ EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver r
 				useless ~= link;
 			}
 		}
-
 		// iterate in reverse order to avoid double destruction
 		foreach(node; useless.retro)
 			node.destroy;
@@ -173,7 +172,7 @@ EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver r
 				if (!curr.empty && curr.back != ';')
 					curr ~= ';';
 
-				if (curr.empty || (curr.length < style.properties.length) || (curr.lastIndexOf(style.properties) < (curr.length - style.properties.length))) {
+				if (curr.empty || (curr.length < style.properties.length) || (curr.lastIndexOf(style.properties) < cast(ptrdiff_t)(curr.length - style.properties.length))) {
 					curr ~= style.properties;
 					element.attr("style", curr);
 				}
