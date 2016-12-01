@@ -1,5 +1,6 @@
 module embaked.embaked;
 
+import std.algorithm;
 import std.array;
 import std.ascii;
 import std.base64;
@@ -166,16 +167,13 @@ EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver r
 		foreach(node; useless.retro)
 			node.destroy;
 
-		foreach(style; styles) {
-			foreach(element; doc.querySelectorAll(style.selector)) {
-				HTMLString curr = std.string.strip(element.attr("style"));
-				if (!curr.empty && curr.back != ';')
-					curr ~= ';';
+		styles.sort!((ref a, ref b) => (a.selector.specificity() != b.selector.specificity()) ? a.selector.specificity() > b.selector.specificity() : a.index > b.index);
 
-				if (curr.empty || (curr.length < style.properties.length) || (curr.lastIndexOf(style.properties) < cast(ptrdiff_t)(curr.length - style.properties.length))) {
-					curr ~= style.properties;
-					element.attr("style", curr);
-				}
+		foreach (style; styles) {
+			foreach (element; doc.querySelectorAll(style.selector)) {
+				HTMLString curr = std.string.strip(element.attr("style"));
+				if (curr.empty || (curr.length < style.properties.length) || (curr.indexOf(style.properties) == -1))
+					element.attr("style", style.properties ~ curr);
 			}
 		}
 
@@ -212,6 +210,7 @@ private struct Style {
 	Selector selector;
 	const(char)[] selectorSource;
 	const(char)[] properties;
+	size_t index;
 }
 
 
@@ -233,7 +232,7 @@ private struct CSSHandler {
 			app_.clear;
 
 			foreach(selector; selectors_) {
-				*styles_ ~= Style(Selector.parse(selector), selector, style);
+				*styles_ ~= Style(Selector.parse(selector), selector, style, styles_.length);
 			}
 		}
 		selectors_.length = 0;
