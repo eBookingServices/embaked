@@ -19,8 +19,8 @@ enum Options {
 	BakeImages		= 1 << 0,
 	BakeStyles		= 1 << 1,
 	BakeContentID	= 1 << 2,	// bake images but replace them and any inline images with a generated content-id
-
-	Default = BakeImages | BakeStyles,
+	StripClasses	= 1 << 3, // strip css classes from all elements
+	Default = BakeImages | BakeStyles | StripClasses
 }
 
 
@@ -143,9 +143,12 @@ EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver r
 		auto handler = CSSHandler(styles);
 
 		foreach (style; doc.elementsByTagName("style")) {
-			parseCSS(style.text, handler);
-
-			useless ~= style;
+			if (!style.hasAttr("ignore-inline")) {
+				parseCSS(style.text, handler);
+				useless ~= style;
+			} else {
+				style.removeAttr("ignore-inline");
+			}
 		}
 
 		foreach (link; doc.elementsByTagName("link")) {
@@ -177,9 +180,10 @@ EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver r
 			}
 		}
 
-		foreach(element; doc.querySelectorAll(allWithClassAttr_)) {
-			element.removeAttr("class");
-		}
+		if (options & Options.StripClasses)
+			foreach(element; doc.querySelectorAll(allWithClassAttr_)) {
+				element.removeAttr("class");
+			}
 	}
 
 	return content;
