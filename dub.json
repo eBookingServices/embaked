@@ -7,7 +7,7 @@
 	"targetType": "library",
 	"targetName": "embaked",
 	"dependencies": {
-		"cssd": "~>0.1.1",
-		"htmld": "~>0.2.9"
+		"cssd": ">=0.1.3",
+		"htmld": ">=0.3.2"
 	}
 }

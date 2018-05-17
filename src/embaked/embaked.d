@@ -139,7 +139,7 @@ EmbeddedContent[] embake(Resolver)(ref Document doc, Options options, Resolver r
 		Style[] styles;
 		styles.reserve(128);
 
-		NodeWrapper!Node[] useless;
+		Node[] useless;
 		auto handler = CSSHandler(styles);
 
 		foreach (style; doc.elementsByTagName("style")) {
